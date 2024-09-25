@@ -209,7 +209,7 @@ colnames(output) <- c("time", "Susceptible", "Infectious","Detected", "Recovered
 ggplot(data = output, aes(x = time)) +
   geom_line(aes(y = Susceptible, color = "Susceptible"), size = 1) +
   geom_line(aes(y = Infectious, color = "Infectious"), size = 1) +
-  geom_line(aes(y = Infectious, color = "Detected"), size = 1) +
+  geom_line(aes(y = Detected, color = "Detected"), size = 1) +
   geom_line(aes(y = Recovered, color = "Recovered"), size = 1) +
   labs(title = "SIR Model Simulation", x = "Days", y = "Population") +
   scale_color_manual("", 
@@ -219,6 +219,97 @@ ggplot(data = output, aes(x = time)) +
   theme(legend.position = "bottom")
 
 ```
+
+
+
+############################################################################################################
+# Let's consider the fact that infected people die
+
+
+
+```{r}
+
+# Define base parameters 
+base_params <- c(
+  beta = 0.00008,         # Transmission rate (source=https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2023.1101436/full)
+  gamma_I = 0.07,        # Recovery rate for those who were infectious and remained on the general population
+  sigma = 0.5,            #Detection rate
+  gamma_Id = 0.056,        # Recovery rate for thise who were detected
+  rho_I = 0.007,           # Mortality rate for the infected people in the community
+  rho_Id = 0.0065          # Mortality rate for the infected people that were detected and isolated
+  
+)
+
+# Define initial state
+initial_state <- c(
+  S = 975,        # Susceptible
+  I = 20,         # Infectious
+  Id = 5,         #Detected population
+  R = 0,         # Recovered
+  D = 0         #Dead
+)
+
+# Define the time sequence for the first 2 years
+times <- seq(0, 60, by = 1)
+
+# Function to run the model
+run_model <- function(params) {
+  model <- function(t, state, parameters) {
+    with(as.list(c(state, parameters)), {
+      dS <- -beta * S * I*Id
+      dI <- beta * S * I*Id - gamma_I * I - sigma*I - rho_I*I
+      dId <- sigma*I - gamma_Id *Id - rho_Id*Id
+      dR <- gamma_I * I + gamma_Id *Id
+      dD <- rho_I*I + rho_Id*Id
+      
+      return(list(c(dS, dI, dId, dR, dD)))
+    })
+  }
+  
+  # Run the model
+  output <- ode(y = initial_state, times = times, func = model, parms = params)
+  
+  return(as.data.frame(output))
+}
+
+# Run the model
+output <- run_model(base_params)
+
+output
+
+
+# Rename columns for clarity
+colnames(output) <- c("time", "Susceptible", "Infectious","Detected", "Recovered","Dead")
+
+# Plot the results
+ggplot(data = output, aes(x = time)) +
+  geom_line(aes(y = Susceptible, color = "Susceptible"), size = 1) +
+  geom_line(aes(y = Infectious, color = "Infectious"), size = 1) +
+  geom_line(aes(y = Detected, color = "Detected"), size = 1) +
+  geom_line(aes(y = Recovered, color = "Recovered"), size = 1) +
+  geom_line(aes(y = Dead, color = "Dead"), size = 1) +
+  labs(title = "SIR Model Simulation", x = "Days", y = "Population") +
+  scale_color_manual("", 
+                     breaks = c("Susceptible", "Infectious", "Detected","Recovered","Dead"),
+                     values = c("blue", "red","brown", "green","black")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
