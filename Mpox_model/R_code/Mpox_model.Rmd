@@ -23,25 +23,24 @@ library(reshape2)
 
 # Simple SIR Model
 
-git remote set-url origin https://github.com/Shakira25/EVD_Model.git
 
 ```{r}
-# Define base parameters (excluding intervention effects)
+# Define base parameters 
 base_params <- c(
-  beta = 0.0003,      # Transmission rate
-  gamma = 1/7        # Recovery rate for I
+  beta = 0.00008,      # Transmission rate (source=https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2023.1101436/full)
+  gamma = 0.056        # Recovery rate for I (same source as above)
   
 )
 
 # Define initial state
 initial_state <- c(
-  S = 1000,        # Susceptible
-  I = 5,          # Infectious
+  S = 999,        # Susceptible
+  I = 1,          # Infectious
   R = 0         # Recovered
 )
 
-# Define the time sequence for the first 365 days
-times <- seq(0, 365, by = 1)
+# Define the time sequence for the first 90 days
+times <- seq(0, 365*2, by = 1)
 
 # Function to run the model
 run_model <- function(params) {
@@ -61,9 +60,11 @@ run_model <- function(params) {
   return(as.data.frame(output))
 }
 
-
 # Run the model
 output <- run_model(base_params)
+
+output
+
 
 # Rename columns for clarity
 colnames(output) <- c("time", "Susceptible", "Infectious", "Recovered")
@@ -89,26 +90,22 @@ ggplot(data = output, aes(x = time)) +
 
 
 ```{r}
-
-# Load necessary libraries
-library(deSolve)
-library(ggplot2)
-
-# Define base parameters (excluding intervention effects)
+# Define base parameters 
 base_params <- c(
-  beta = 0.0003,      # Transmission rate
-  gamma = 1/7         # Recovery rate for I
+  beta = 0.00008,      # Transmission rate (source=https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2023.1101436/full)
+  gamma = 0.056        # Recovery rate for I (same source as above)
+  
 )
 
 # Define initial state
 initial_state <- c(
-  S = 1000,           # Susceptible
-  I = 50,             # Infectious
-  R = 10              # Recovered
+  S = 980,        # Susceptible
+  I = 20,          # Infectious
+  R = 0         # Recovered
 )
 
-# Define the time sequence for the first 365 days
-times <- seq(0, 365, by = 1)
+# Define the time sequence for the first 90 days
+times <- seq(0, 365*2, by = 1)
 
 # Function to run the model
 run_model <- function(params) {
@@ -122,7 +119,7 @@ run_model <- function(params) {
     })
   }
   
-  # Run the model using the ode function
+  # Run the model
   output <- ode(y = initial_state, times = times, func = model, parms = params)
   
   return(as.data.frame(output))
@@ -130,6 +127,9 @@ run_model <- function(params) {
 
 # Run the model
 output <- run_model(base_params)
+
+output
+
 
 # Rename columns for clarity
 colnames(output) <- c("time", "Susceptible", "Infectious", "Recovered")
@@ -146,6 +146,77 @@ ggplot(data = output, aes(x = time)) +
   theme_minimal() +
   theme(legend.position = "bottom")
 
+
+```
+
+
+############################################################################################################
+# Let's consider the fact that not everyone is detected
+
+
+
+```{r}
+
+# Define base parameters 
+base_params <- c(
+  beta = 0.00008,         # Transmission rate (source=https://www.frontiersin.org/journals/public-health/articles/10.3389/fpubh.2023.1101436/full)
+  gamma_I = 0.07,        # Recovery rate for those who were infectious and remained on the general population
+  sigma = 0.5,            #Detection rate
+  gamma_Id = 0.056        # Recovery rate for thise who were detected
+  
+)
+
+# Define initial state
+initial_state <- c(
+  S = 975,        # Susceptible
+  I = 20,         # Infectious
+  Id = 5,         #Detected population
+  R = 0         # Recovered
+)
+
+# Define the time sequence for the first 2 years
+times <- seq(0, 60, by = 1)
+
+# Function to run the model
+run_model <- function(params) {
+  model <- function(t, state, parameters) {
+    with(as.list(c(state, parameters)), {
+      dS <- -beta * S * I*Id
+      dI <- beta * S * I*Id - gamma_I * I - sigma*I
+      dId <- sigma*I - gamma_Id *Id
+      dR <- gamma_I * I + gamma_Id *Id
+      
+      return(list(c(dS, dI, dId, dR)))
+    })
+  }
+  
+  # Run the model
+  output <- ode(y = initial_state, times = times, func = model, parms = params)
+  
+  return(as.data.frame(output))
+}
+
+# Run the model
+output <- run_model(base_params)
+
+output
+
+
+# Rename columns for clarity
+colnames(output) <- c("time", "Susceptible", "Infectious","Detected", "Recovered")
+
+# Plot the results
+ggplot(data = output, aes(x = time)) +
+  geom_line(aes(y = Susceptible, color = "Susceptible"), size = 1) +
+  geom_line(aes(y = Infectious, color = "Infectious"), size = 1) +
+  geom_line(aes(y = Infectious, color = "Detected"), size = 1) +
+  geom_line(aes(y = Recovered, color = "Recovered"), size = 1) +
+  labs(title = "SIR Model Simulation", x = "Days", y = "Population") +
+  scale_color_manual("", 
+                     breaks = c("Susceptible", "Infectious", "Detected","Recovered"),
+                     values = c("blue", "red","brown", "green")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
 
 ```
 
