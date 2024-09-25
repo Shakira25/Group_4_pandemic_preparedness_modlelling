@@ -23,6 +23,8 @@ library(reshape2)
 
 # Simple SIR Model
 
+git remote set-url origin https://github.com/Shakira25/EVD_Model.git
+
 ```{r}
 # Define base parameters (excluding intervention effects)
 base_params <- c(
