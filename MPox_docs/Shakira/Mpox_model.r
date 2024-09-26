@@ -3,9 +3,6 @@
 #author: "Group 4 members"
 #date: "2024-09-25"
 
-
-setwd("C:/Users/bbrsh/Desktop/Shakira/Shakira/Infectious diseases modelling opportunity Kwame Nkuruma/Hands On/Group_4/MPox_docs/Shakira")
-
 cases<-read.csv("mpox_2024.csv")
 observed_data<-cases$new_cases #Extract the weekly case counts
 # Load the necessary libraries
@@ -32,11 +29,11 @@ initial_state <- c(
 )
 
 # Define the time sequence (57 weeks)
-times <- seq(0, 57, by = 1)  # Replace with appropriate time frame
+times <- seq(0, 56, by = 1)  # Replace with appropriate time frame
 
 # Define the ODE system
-mpox_model <- function(time, state, params) {
-  with(as.list(c(state, params)), {
+mpox_model <- function(time, state, parameters) {
+  with(as.list(c(state, parameters)), {
     
     # ODEs based on the flowchart parameters
     dS <- -beta * S * I
@@ -111,3 +108,57 @@ conf_intervals <- cbind(estimated - 1.96 * std_errors, estimated + 1.96 * std_er
 print(conf_intervals)
 
 params["sigma"] <- estimated["sigma"]
+
+# Simulate again with new parameters
+simulation <- ode(y = initial_state, times = times, func = mpox_model, parms = params)
+simulation_df <- as.data.frame(simulation)
+
+# Define start date for the timeline
+start_date <- as.Date("2023-08-20")  # Example start date
+
+# Create a date vector for the time points (based on weeks, as the time vector is weekly)
+date_vector <- seq.Date(from = start_date, by = "week", length.out = length(times))
+project_time <- seq(max(times),max(times)+52*1) # 1 year more (52 Weeks)
+projection <- ode(y = initial_state, times = project_time, func = mpox_model, parms = params)
+projection_df <- as.data.frame(projection)
+
+# Create a date vector for the projection period
+projection_date_vector <- seq.Date(from = max(date_vector), by = "week", length.out = length(project_time))
+
+# Plot the observed and simulated results with dates on the x-axis
+print(
+  plot(date_vector, simulation_df$Ihd, type = "l", col = "red", ylab = "Detected Infected Humans (Id)", xlab = "Date", xaxt = "n")
+)
+# Overlay observed data (make sure 'observed_data' has the correct length)
+points(date_vector, observed_data, col = "blue", pch = 16)
+
+# Format the x-axis to show dates
+axis.Date(1, at = date_vector, format = "%b %Y")  # Custom format: "Month Year"
+legend("topleft", legend = c("Simulated Id", "Observed Data"), col = c("red", "blue"), lty = c(1, NA), pch=c(NA,16))
+
+# Plot the projection with dates on the x-axis
+print(
+  plot(projection_date_vector, projection_df$Id, type = "l", col = "red", ylab = "Projected detected Infected Humans (Id)", xlab = "Date", xaxt = "n")
+)
+axis.Date(1, at = projection_date_vector, format = "%b %Y")
+
+
+#################### Projection ( 2023 to 2025)
+#################### 
+
+project_time <- seq(0,max(times)+52*1) # 1 year more (52 Weeks)
+projection <- ode(y = initial_state, times = project_time, func = mpox_model, parms = params)
+projection_df <- as.data.frame(projection)
+
+# Create a date vector for the projection period
+projection_date_vector <- seq.Date(from = start_date, by = "week", length.out = length(project_time))
+
+
+#Plot the projection with dates on the x-axis
+print(
+  plot(projection_date_vector, projection_df$Id, type = "l", col = "red", ylab = "Projected Detected Infected Humans (Id)", xlab = "Date", xaxt = "n")
+)
+# Overlay observed data on the projection graph (observed data only goes to the current time)
+points(date_vector, observed_data, col = "blue", pch = 16)  # Observed data only goes up to current time
+axis.Date(1, at = projection_date_vector, format = "%b %Y")
+legend("topleft", legend = c("Projected MPOX Id", "Observed Data"), col = c("red", "blue"), lty = c(1, NA), pch=c(NA,16))
