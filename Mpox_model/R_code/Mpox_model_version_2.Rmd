@@ -39,7 +39,7 @@ observed_data<-cases$new_cases #Extract the weekly case counts
 # Define base parameters 
 base_params <- c(
   beta = 0.25,      # Transmission rate 
-  gamma = 0.7       # Recovery rate for I 
+  gamma = 0.07       # Recovery rate for I 
   
 )
 
