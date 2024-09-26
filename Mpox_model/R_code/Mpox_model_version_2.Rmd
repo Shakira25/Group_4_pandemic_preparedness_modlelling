@@ -38,15 +38,15 @@ observed_data<-cases$new_cases #Extract the weekly case counts
 ```{r}
 # Define base parameters 
 base_params <- c(
-  beta = 0.05,      # Transmission rate 
+  beta = 0.25,      # Transmission rate 
   gamma = 0.7       # Recovery rate for I 
   
 )
 
 # Define initial state
 initial_state <- c(
-  S = 105e6,        # Susceptible
-  I = 1,          # Infectious
+  S = 103e3,        # Susceptible
+  I = 8,          # Infectious
   R = 0         # Recovered
 )
 
@@ -57,8 +57,9 @@ times <- seq(0, 57, by = 1)
 run_model <- function(params) {
   model <- function(t, state, parameters) {
     with(as.list(c(state, parameters)), {
-      dS <- -beta * S * I
-      dI <- beta * S * I - gamma * I 
+      N <- S + I + R
+      dS <- -beta * S * I/N
+      dI <- beta * S * I/N - gamma * I 
       dR <- gamma * I 
       
       return(list(c(dS, dI, dR)))
@@ -103,14 +104,14 @@ ggplot(data = output, aes(x = time)) +
 ```{r}
 # Define base parameters 
 base_params <- c(
-  beta = 0.05,      # Transmission rate 
+  beta = 0.25,      # Transmission rate 
   gamma = 0.07       # Recovery rate for I 
   
 )
 
 # Define initial state
 initial_state <- c(
-  S = 105e6,        # Susceptible
+  S = 105e3,        # Susceptible
   I = 20,          # Infectious
   R = 0         # Recovered
 )
@@ -122,8 +123,9 @@ times <- seq(0, 57, by = 1)
 run_model <- function(params) {
   model <- function(t, state, parameters) {
     with(as.list(c(state, parameters)), {
-      dS <- -beta * S * I
-      dI <- beta * S * I - gamma * I 
+      N = S + I + R
+      dS <- -beta * S * I/N
+      dI <- beta * S * I/N - gamma * I 
       dR <- gamma * I 
       
       return(list(c(dS, dI, dR)))
@@ -170,15 +172,15 @@ ggplot(data = output, aes(x = time)) +
 
 # Define base parameters
 base_params <- c(
-  beta = 0.05,    # Transmission rate
-  gamma_I = 0.7,    # Recovery rate for general infectious population
+  beta = 0.25,    # Transmission rate
+  gamma_I = 0.07,    # Recovery rate for general infectious population
   sigma = 0.05,       # Detection rate
   gamma_Id = 0.14   # Recovery rate for detected population
 )
 
 # Define initial state
 initial_state <- c(
-  S = 105e6,    # Susceptible
+  S = 105e3,    # Susceptible
   I = 20,     # Infectious
   Id = 2,     # Detected population
   R = 0       # Recovered
@@ -192,8 +194,9 @@ mpox_model <- function(time, state, parameters) {
   with(as.list(c(state, parameters)), {
     
     # ODEs based on the flowchart parameters
-    dS <- -beta * S * I
-    dI <- beta * S * I - gamma_I * I - sigma * I
+    N <- S + I + Id + R
+    dS <- -beta * S * I/N
+    dI <- beta * S * I/N - gamma_I * I - sigma * I
     dId <- sigma * I - gamma_Id * Id
     dR <- gamma_I * I + gamma_Id * Id
     
@@ -203,6 +206,8 @@ mpox_model <- function(time, state, parameters) {
 
 # Run the model
 output <- ode(y = initial_state, times = times, func = mpox_model, parms = base_params)
+
+output
 
 # Rename columns for clarity
 colnames(output) <- c("time", "Susceptible", "Infectious", "Detected", "Recovered")
@@ -316,15 +321,15 @@ print(mle_estimated)
 
 # Define base parameters
 base_params <- c(
-  beta = 0.05,    # Transmission rate
-  gamma_I = 0.7,    # Recovery rate for general infectious population
+  beta = 0.25,    # Transmission rate
+  gamma_I = 0.07,    # Recovery rate for general infectious population
   sigma = 0.01,       # Detection rate
   gamma_Id = 0.14   # Recovery rate for detected population
 )
 
 # Define initial state
 initial_state <- c(
-  S = 105e6,    # Susceptible
+  S = 105e3,    # Susceptible
   I = 20,     # Infectious
   Id = 2,     # Detected population
   R = 0       # Recovered
@@ -338,8 +343,9 @@ mpox_model <- function(time, state, parameters) {
   with(as.list(c(state, parameters)), {
     
     # ODEs based on the flowchart parameters
-    dS <- -beta * S * I
-    dI <- beta * S * I - gamma_I * I - sigma * I
+    N <- S + I + Id + R
+    dS <- -beta * S * I/N
+    dI <- beta * S * I/N - gamma_I * I - sigma * I
     dId <- sigma * I - gamma_Id * Id
     dR <- gamma_I * I + gamma_Id * Id
     
@@ -474,18 +480,18 @@ legend("topleft", legend = c("Projected MPOX Id", "Observed Data"), col = c("red
 
 # Define base parameters 
 base_params <- c(
-  beta = 0.05,         # Transmission rate 
-  gamma_I = 0.7,        # Recovery rate for those who were infectious and remained on the general population
+  beta = 0.25,         # Transmission rate 
+  gamma_I = 0.07,        # Recovery rate for those who were infectious and remained on the general population
   sigma = 0.01,            #Detection rate
   gamma_Id = 0.14,        # Recovery rate for thise who were detected
-  rho_I = 0.049,           # Mortality rate for the infected people in the community
-  rho_Id = 0.0455          # Mortality rate for the infected people that were detected and isolated
+  rho_I = 0.0049,           # Mortality rate for the infected people in the community
+  rho_Id = 0.00455          # Mortality rate for the infected people that were detected and isolated
   
 )
 
 # Define initial state
 initial_state <- c(
-  S = 105e6,        # Susceptible
+  S = 105e3,        # Susceptible
   I = 20,         # Infectious
   Id = 2,         #Detected population
   R = 0,         # Recovered
@@ -499,8 +505,9 @@ times <- seq(0, 37, by = 1)
 run_model <- function(params) {
   model <- function(t, state, parameters) {
     with(as.list(c(state, parameters)), {
-      dS <- -beta * S * I
-      dI <- beta * S * I - gamma_I * I - sigma*I - rho_I*I
+      N <- S + I + Id + R + D
+      dS <- -beta * S * I/N
+      dI <- beta * S * I/N - gamma_I * I - sigma*I - rho_I*I
       dId <- sigma*I - gamma_Id *Id - rho_Id*Id
       dR <- gamma_I * I + gamma_Id *Id
       dD <- rho_I*I + rho_Id*Id
@@ -551,18 +558,18 @@ ggplot(data = output, aes(x = time)) +
 
 # Define base parameters
 base_params <- c(
-  beta_s = 0.05,         # Transmission rate via the sexual route
+  beta_s = 0.25,         # Transmission rate via the sexual route
   beta_ns = 0.06,        # Transmission rate via other non-sexual routes
-  gamma_I = 0.7,         # Recovery rate for those who were infectious and remained in the general population
+  gamma_I = 0.07,         # Recovery rate for those who were infectious and remained in the general population
   sigma = 0.01,          # Detection rate
   gamma_Id = 0.14,       # Recovery rate for those who were detected
-  rho_I = 0.049,         # Mortality rate for the infected people in the community
-  rho_Id = 0.0455        # Mortality rate for the infected people that were detected and isolated
+  rho_I = 0.0049,         # Mortality rate for the infected people in the community
+  rho_Id = 0.00455        # Mortality rate for the infected people that were detected and isolated
 )
 
 # Define initial state
 initial_state <- c(
-  S = 105e6,    # Susceptible
+  S = 105e3,    # Susceptible
   I_s = 9,      # Infectious via the sexual route
   I_ns = 11,    # Infectious via other routes
   Id = 2,       # Detected population
@@ -577,9 +584,10 @@ times <- seq(0, 37, by = 1)
 run_model <- function(params) {
   model <- function(t, state, parameters) {
     with(as.list(c(state, parameters)), {
-      dS <- -beta_s * S * I_s - beta_ns * S * I_ns
-      dI_s <- beta_s * S * I_s - gamma_I * I_s - sigma * I_s - rho_I * I_s
-      dI_ns <- beta_ns * S * I_ns - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
+      N <- S + I_s + I_ns + Id + R + D
+      dS <- -beta_s * S * I_s/N - beta_ns * S * I_ns/N
+      dI_s <- beta_s * S * I_s/N - gamma_I * I_s - sigma * I_s - rho_I * I_s
+      dI_ns <- beta_ns * S * I_ns/N - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
       dId <- sigma * (I_s + I_ns) - gamma_Id * Id - rho_Id * Id
       dR <- gamma_I * (I_s + I_ns) + gamma_Id * Id
       dD <- rho_I * (I_s + I_ns) + rho_Id * Id
@@ -707,18 +715,18 @@ params["beta_s"] <- fit$par["beta_s"]
 
 # Define base parameters
 base_params <- c(
-  beta_s = 0.01313275,         # Transmission rate via the sexual route
+  beta_s = 0.02068134,         # Transmission rate via the sexual route
   beta_ns = 0.06,        # Transmission rate via other non-sexual routes
-  gamma_I = 0.7,         # Recovery rate for those who were infectious and remained in the general population
+  gamma_I = 0.07,         # Recovery rate for those who were infectious and remained in the general population
   sigma = 0.01,          # Detection rate
   gamma_Id = 0.14,       # Recovery rate for those who were detected
-  rho_I = 0.049,         # Mortality rate for the infected people in the community
-  rho_Id = 0.0455        # Mortality rate for the infected people that were detected and isolated
+  rho_I = 0.0049,         # Mortality rate for the infected people in the community
+  rho_Id = 0.00455        # Mortality rate for the infected people that were detected and isolated
 )
 
 # Define initial state
 initial_state <- c(
-  S = 105e6,    # Susceptible
+  S = 105e3,    # Susceptible
   I_s = 9,      # Infectious via the sexual route
   I_ns = 11,    # Infectious via other routes
   Id = 2,       # Detected population
@@ -733,9 +741,10 @@ times <- seq(0, 37, by = 1)
 run_model <- function(params) {
   model <- function(t, state, parameters) {
     with(as.list(c(state, parameters)), {
-      dS <- -beta_s * S * I_s - beta_ns * S * I_ns
-      dI_s <- beta_s * S * I_s - gamma_I * I_s - sigma * I_s - rho_I * I_s
-      dI_ns <- beta_ns * S * I_ns - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
+      N <- S + I_s + I_ns + Id + R + D
+      dS <- -beta_s * S * I_s/N - beta_ns * S * I_ns/N
+      dI_s <- beta_s * S * I_s/N - gamma_I * I_s - sigma * I_s - rho_I * I_s
+      dI_ns <- beta_ns * S * I_ns/N - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
       dId <- sigma * (I_s + I_ns) - gamma_Id * Id - rho_Id * Id
       dR <- gamma_I * (I_s + I_ns) + gamma_Id * Id
       dD <- rho_I * (I_s + I_ns) + rho_Id * Id
