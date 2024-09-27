@@ -3,6 +3,8 @@ title: "Group 4 Mpox model"
 author: "Group 4 members"
 date: "2024-09-26"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -25,13 +27,19 @@ library(MASS)
 
 
 
-```{r}
 
-cases<-read.csv("C:/Users/bbrsh/Desktop/Shakira/Shakira/Infectious diseases modelling opportunity Kwame Nkuruma/Hands On/Group_4/MPox_docs/Mpox_data/mpox_2024.csv")
+
+# Loading the dataset
+
+```{r}
+cases<-read.csv("C:/Users/bbrsh/Desktop/Shakira/Shakira/Infectious diseases modelling opportunity Kwame Nkuruma/Hands On/Group 4 things/MPox_docs/Shakira/mpox_2024.csv")
 observed_data<-cases$new_cases #Extract the weekly case counts
 
 ```
 
+
+
+##########################################################################################################
 
 
 
@@ -39,21 +47,21 @@ observed_data<-cases$new_cases #Extract the weekly case counts
 
 # Define base parameters
 base_params <- c(
-  beta_s = (0.09 * 1.5),  # Transmission rate via the sexual route
-  beta_ns = 0.09,         # Transmission rate via other non-sexual routes
-  gamma_I = 0.7,              # Recovery rate for those who were infectious and remained in the general population
-  sigma = 0.01,                # Detection rate
-  gamma_Id = 1.4,             # Recovery rate for those who were detected
-  rho_I = 0.02,                # Mortality rate for the infected people in the community
-  rho_Id = 0.01               # Mortality rate for the infected people that were detected and isolated
+  beta_s = (0.25 * 2),  # Transmission rate via the sexual route
+  beta_ns = 0.25,         # Transmission rate via other non-sexual routes
+  gamma_I = 0.6,              # Recovery rate for those who were infectious and remained in the general population
+  sigma = 0.3,                # Detection rate
+  gamma_Id = 0.8,             # Recovery rate for those who were detected
+  rho_I = 0.065,                # Mortality rate for the infected people in the community
+  rho_Id = 0.03               # Mortality rate for the infected people that were detected and isolated
 )
 
 # Define initial state
 initial_state <- c(
   S = 105e3,    # Susceptible
-  I_s = 11,     # Infectious via the sexual route
-  I_ns = 9,     # Infectious via other routes
-  Id = 2,       # Detected population
+  I_s = 5,     # Infectious via the sexual route
+  I_ns = 20,     # Infectious via other routes
+  Id = 8,       # Detected population
   R = 0,        # Recovered
   D = 0         # Dead
 )
@@ -98,7 +106,7 @@ ggplot(data = output, aes(x = time)) +
   geom_line(aes(y = Detected, color = "Detected"), size = 1) +
   geom_line(aes(y = Recovered, color = "Recovered"), size = 1) +
   geom_line(aes(y = Dead, color = "Dead"), size = 1) +
-  labs(title = "SEIRD Model Simulation", x = "Time (weeks)", y = "Population") +
+  labs(title = "SIRD Model Simulation", x = "Time (weeks)", y = "Population") +
   scale_color_manual("", 
                      breaks = c("Susceptible", "Infectious_Sexual", "Infectious_NonSexual", "Detected", "Recovered", "Dead"),
                      values = c("blue", "red", "purple", "orange", "green", "black")) +
@@ -121,7 +129,7 @@ cost_function <- function(pars, observed_data) {
   # Simulate the model
   simulation <- ode(y = initial_state, times = times, func = mpox_model, parms = params)
   
-  # Extract the number of detected individuals (Id)
+  # Extract the number of infected individuals (Id)
   simulated_Id <- simulation[, "Id"]
   
   # Calculate the sum of squared errors
@@ -129,11 +137,11 @@ cost_function <- function(pars, observed_data) {
 }
 
 # Define lower and upper bounds for the parameters
-lower_bounds <- c(beta_ns = 0.05, sigma = 0.001) #, rho_Id = 0.0001)
-upper_bounds <- c(beta_ns = 0.5, sigma = 0.05)#, rho_Id = 0.05)
+lower_bounds <- c(beta_ns = 0.1, sigma = 0.1) #, rho_Id = 0.0001)
+upper_bounds <- c(beta_ns = 0.5, sigma = 1)#, rho_Id = 0.05)
 
 # Initial guesses for the parameters to be estimated
-initial_guesses <- c(beta_ns = 0.09, sigma = 0.01)
+initial_guesses <- c(beta_ns = 0.25, sigma = 0.3)
 
 # Perform parameter estimation using optim with bounds
 fit <- optim(par = initial_guesses, fn = cost_function, observed_data = observed_data, 
@@ -158,6 +166,26 @@ params["beta_s"] <- 2 * estimated["beta_ns"]
 params["sigma"] <- estimated["sigma"]
 #params["rho_Id"] <- estimated["rho_Id"]
 #params["rho_I"] <- 2 * estimated["rho_Id"]
+
+
+# Run the simulation again with estimated parameters
+simulation_updated <- ode(y = initial_state, times = times, func = mpox_model, parms = params)
+
+# Plot observed vs predicted
+predicted_Id <- simulation_updated[, "Id"]
+comparison_df <- data.frame(
+  time = times,
+  Observed = observed_data,
+  Predicted = predicted_Id
+)
+
+ggplot(data = comparison_df, aes(x = time)) +
+  geom_line(aes(y = Observed, color = "Observed"), size = 1) +
+  geom_line(aes(y = Predicted, color = "Predicted"), size = 1, linetype = "dashed") +
+  labs(title = "Observed vs. Predicted Detected Cases", x = "Time (weeks)", y = "Detected Cases") +
+  scale_color_manual("", values = c("Observed" = "red", "Predicted" = "blue")) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
 
 
 ```
@@ -231,30 +259,42 @@ axis.Date(1, at = projection_date_vector, format = "%b %Y")
 
 ```{r}
 
-#################### Projection ( 2023 to 2025)
-#################### 
+##################### Projection (2023 to 2025) #################### 
 
-project_time <- seq(0,max(times)+52*1) # 1 year more (52 Weeks)
+project_time <- seq(0, max(times) + 52 * 1) # 1 year more (52 Weeks)
 projection <- ode(y = initial_state, times = project_time, func = mpox_model, parms = params)
 projection_df <- as.data.frame(projection)
 
 # Create a date vector for the projection period
 projection_date_vector <- seq.Date(from = start_date, by = "week", length.out = length(project_time))
 
-projection_df$I = projection_df$I_s + projection_df$I_ns
-#Plot the projection with dates on the x-axis
-#print(
-#  plot(projection_date_vector, projection_df$Id, type = "l", col = "red", ylab = "Projected Detected #Infected Humans (Id)", xlab = "Date", xaxt = "n")
-#)
+# Plot the projection with dates on the x-axis
+plot(projection_date_vector, projection_df$Id, type = "l", col = "red", 
+     ylab = "Projected Detected Infected Humans (Id)", xlab = "Date", xaxt = "n")
+
 # Overlay observed data on the projection graph (observed data only goes to the current time)
+points(date_vector, observed_data, col = "blue", pch = 16)
 
-#plot(projection_df$I, col = "red", pch = 16, type="b")
-plot(date_vector, observed_data, col = "blue", pch = 16, type="b")  # Observed data only goes up to current time
+# Format the x-axis to show dates
 axis.Date(1, at = projection_date_vector, format = "%b %Y")
-legend("topleft", legend = c("Projected MPOX Id", "Observed Data"), col = c("red", "blue"), lty = c(1, NA), pch=c(NA,16))
 
-
+# Add the legend further to the right outside the plot area
+legend("topright", inset = c(-0.2, 0), legend = c("Projected MPOX Id", "Observed Data"), 
+       col = c("red", "blue"), lty = c(1, NA), pch = c(NA, 16), xpd = TRUE, xjust = 1)
+#
 ```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
