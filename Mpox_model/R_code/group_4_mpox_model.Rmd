@@ -204,6 +204,429 @@ save_plot(plot3, "projected_cases.png")
 
 
 
+##############################################################################################
+
+# Let's add an intervention e.g contact tracing, quarantine etc
+
+# First run the model with the estimates estimates
+
+```{r}
+
+# Define base parameters
+base_params <- c(
+  beta_s = (0.5 * 2),  # Transmission rate via the sexual route
+  beta_ns = 0.5,       # Transmission rate via other non-sexual routes
+  gamma_I = 0.6,       # Recovery rate for those who were infectious and remained in the general population
+  sigma = 0.1910888,   # Detection rate
+  gamma_Id = 0.8,      # Recovery rate for those who were detected
+  rho_I = 0.065,       # Mortality rate for the infected people in the community
+  rho_Id = 0.03        # Mortality rate for the infected people that were detected and isolated
+)
+
+# Define initial state
+initial_state <- c(
+  S = 105e3,    # Susceptible
+  I_s = 5,      # Infectious via the sexual route
+  I_ns = 20,    # Infectious via other routes
+  Id = 8,       # Detected population
+  R = 0,        # Recovered
+  D = 0         # Dead
+)
+
+# Define the time sequence for 57 weeks
+times <- seq(1, 57, by = 1)
+
+# Define the model function
+mpox_model <- function(time, state, parms) {
+  with(as.list(c(state, parms)), {
+    N <- S + I_s + I_ns + Id + R + D
+    
+    dS <- -beta_s * S * I_s / N - beta_ns * S * I_ns / N
+    dI_s <- beta_s * S * I_s / N - gamma_I * I_s - sigma * I_s - rho_I * I_s
+    dI_ns <- beta_ns * S * I_ns / N - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
+    dId <- sigma * (I_s + I_ns) - gamma_Id * Id - rho_Id * Id
+    dR <- gamma_I * (I_s + I_ns) + gamma_Id * Id
+    dD <- rho_I * (I_s + I_ns) + rho_Id * Id
+    
+    return(list(c(dS, dI_s, dI_ns, dId, dR, dD)))
+  })
+}
+
+# Run the simulation
+simulation <- ode(y = initial_state, times = times, func = mpox_model, parms = base_params)
+
+# Convert the output to a data frame for analysis and plotting
+output <- as.data.frame(simulation)
+
+# Rename columns for clarity
+colnames(output) <- c("time", "Susceptible", "Infectious_Sexual", "Infectious_NonSexual", "Detected", "Recovered", "Dead")
+
+# Calculate total infected
+output$Total_Infected <- output$Infectious_Sexual + output$Infectious_NonSexual
+
+# Display the output
+print(output)
+
+# Plot only the total infected
+plot2 = ggplot(data = output, aes(x = time)) +
+  geom_line(aes(y = Total_Infected, color = "Total Infected"), size = 1) +  # Plot Total Infected
+  labs(title = "Total Infected Population Over Time", x = "Time (weeks)", y = "Population") +
+  scale_color_manual("", 
+                     breaks = c("Total Infected"),
+                     values = c("brown")) +  # Set color for Total Infected
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+
+
+# Save the first plot
+save_plot(plot2, "sird_model_simulation_with_estimated_parameters.png")
+
+
+```
+
+
+
+
+
+# Now, let's introduce an intervention like contact tracing. Contact tracing reduces the transmission rate by quickly removing infected individuals. Using 
+(1−m𝑢)*beta_s and (1−mu)*beta_ns , we'll examine mu values of 0, 0.01, 0.04, and 0.08, and plot the total number of infected individuals for each mu.
+
+```{r}
+
+# Define base parameters
+base_params <- c(
+  beta_s = (0.5 * 2),  # Transmission rate via the sexual route
+  beta_ns = 0.5,       # Transmission rate via other non-sexual routes
+  gamma_I = 0.6,       # Recovery rate for those who were infectious and remained in the general population
+  sigma = 0.1910888,   # Detection rate
+  gamma_Id = 0.8,      # Recovery rate for those who were detected
+  rho_I = 0.065,       # Mortality rate for the infected people in the community
+  rho_Id = 0.03        # Mortality rate for the infected people that were detected and isolated
+)
+
+# Define initial state
+initial_state <- c(
+  S = 105e3,    # Susceptible
+  I_s = 5,      # Infectious via the sexual route
+  I_ns = 20,    # Infectious via other routes
+  Id = 8,       # Detected population
+  R = 0,        # Recovered
+  D = 0         # Dead
+)
+
+# Define the time sequence for 57 weeks
+times <- seq(1, 57, by = 1)
+
+# Define the model function with contact tracing effect
+mpox_model <- function(time, state, parms) {
+  with(as.list(c(state, parms)), {
+    N <- S + I_s + I_ns + Id + R + D
+    
+    # Calculate the modified transmission rates
+    mu <- parms["mu"]  # Intervention effectiveness
+    effective_beta_s <- (1 - mu) * beta_s
+    effective_beta_ns <- (1 - mu) * beta_ns
+    
+    dS <- -effective_beta_s * S * I_s / N - effective_beta_ns * S * I_ns / N
+    dI_s <- effective_beta_s * S * I_s / N - gamma_I * I_s - sigma * I_s - rho_I * I_s
+    dI_ns <- effective_beta_ns * S * I_ns / N - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
+    dId <- sigma * (I_s + I_ns) - gamma_Id * Id - rho_Id * Id
+    dR <- gamma_I * (I_s + I_ns) + gamma_Id * Id
+    dD <- rho_I * (I_s + I_ns) + rho_Id * Id
+    
+    return(list(c(dS, dI_s, dI_ns, dId, dR, dD)))
+  })
+}
+
+# Values for mu to test
+mu_values <- c(0,0.01, 0.04, 0.08)
+
+# Prepare an empty list to store simulation results
+simulation_results <- list()
+
+# Run simulations for different values of mu
+for (mu in mu_values) {
+  # Add mu to parameters
+  params_with_mu <- c(base_params, mu = mu)
+  
+  # Run the simulation
+  simulation <- ode(y = initial_state, times = times, func = mpox_model, parms = params_with_mu)
+  
+  # Convert the output to a data frame for analysis and plotting
+  output <- as.data.frame(simulation)
+  
+  # Rename columns for clarity
+  colnames(output) <- c("time", "Susceptible", "Infectious_Sexual", "Infectious_NonSexual", "Detected", "Recovered", "Dead")
+  
+  # Calculate total infected
+  output$Total_Infected <- output$Infectious_Sexual + output$Infectious_NonSexual
+  
+  # Store results with mu as a list entry
+  simulation_results[[paste0("mu_", mu)]] <- output
+}
+
+# Combine results into one data frame for plotting
+combined_results <- do.call(rbind, lapply(names(simulation_results), function(name) {
+  data <- simulation_results[[name]]
+  data$mu <- name  # Add the mu value as a column
+  return(data)
+}))
+
+
+# Plot total infected for each mu value
+plot3 = ggplot(data = combined_results, aes(x = time, y = Total_Infected, color = mu)) +
+  geom_line(size = 1) +  # Plot Total Infected for each mu
+  labs(title = "Total Infected Population Over Time with Contact Tracing", 
+       x = "Time (weeks)", 
+       y = "Population") +
+  scale_color_manual("",
+                     breaks = c("mu_0", "mu_0.01", "mu_0.04", "mu_0.08"),  # Correct breaks for mu
+                     labels = c("Contact Tracing (μ = 0)", "Contact Tracing (μ = 0.01)", 
+                                "Contact Tracing (μ = 0.04)", "Contact Tracing (μ = 0.08)"),  # Update labels
+                     values = c("brown", "orange", "green", "purple")) +  # Set colors for mu values
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Save the first plot
+save_plot(plot3, "Total_number_infected_per_different_contact_tracing_rates.png")
+
+
+
+```
+
+
+
+# Let's also examine an intervention like quarantine. This also reduces the beta values. We'll consider quarantine rates of 0, 0.01, 0.04, and 0.08.
+
+```{r}
+
+# Define base parameters
+base_params <- c(
+  beta_s = (0.5 * 2),  # Transmission rate via the sexual route
+  beta_ns = 0.5,       # Transmission rate via other non-sexual routes
+  gamma_I = 0.6,       # Recovery rate for those who were infectious and remained in the general population
+  sigma = 0.1910888,   # Detection rate
+  gamma_Id = 0.8,      # Recovery rate for those who were detected
+  rho_I = 0.065,       # Mortality rate for the infected people in the community
+  rho_Id = 0.03        # Mortality rate for the infected people that were detected and isolated
+)
+
+# Define initial state
+initial_state <- c(
+  S = 105e3,    # Susceptible
+  I_s = 5,      # Infectious via the sexual route
+  I_ns = 20,    # Infectious via other routes
+  Id = 8,       # Detected population
+  R = 0,        # Recovered
+  D = 0         # Dead
+)
+
+# Define the time sequence for 57 weeks
+times <- seq(1, 57, by = 1)
+
+# Define the model function with quarantine effect
+mpox_model <- function(time, state, parms) {
+  with(as.list(c(state, parms)), {
+    N <- S + I_s + I_ns + Id + R + D
+    
+    # Calculate the modified transmission rates
+    mu <- parms["mu"]  # Intervention effectiveness
+    effective_beta_s <- (1 - mu) * beta_s
+    effective_beta_ns <- (1 - mu) * beta_ns
+    
+    dS <- -effective_beta_s * S * I_s / N - effective_beta_ns * S * I_ns / N
+    dI_s <- effective_beta_s * S * I_s / N - gamma_I * I_s - sigma * I_s - rho_I * I_s
+    dI_ns <- effective_beta_ns * S * I_ns / N - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
+    dId <- sigma * (I_s + I_ns) - gamma_Id * Id - rho_Id * Id
+    dR <- gamma_I * (I_s + I_ns) + gamma_Id * Id
+    dD <- rho_I * (I_s + I_ns) + rho_Id * Id
+    
+    return(list(c(dS, dI_s, dI_ns, dId, dR, dD)))
+  })
+}
+
+# Values for mu to test
+mu_values <- c(0,0.01, 0.04, 0.08)
+
+# Prepare an empty list to store simulation results
+simulation_results <- list()
+
+# Run simulations for different values of mu
+for (mu in mu_values) {
+  # Add mu to parameters
+  params_with_mu <- c(base_params, mu = mu)
+  
+  # Run the simulation
+  simulation <- ode(y = initial_state, times = times, func = mpox_model, parms = params_with_mu)
+  
+  # Convert the output to a data frame for analysis and plotting
+  output <- as.data.frame(simulation)
+  
+  # Rename columns for clarity
+  colnames(output) <- c("time", "Susceptible", "Infectious_Sexual", "Infectious_NonSexual", "Detected", "Recovered", "Dead")
+  
+  # Calculate total infected
+  output$Total_Infected <- output$Infectious_Sexual + output$Infectious_NonSexual
+  
+  # Store results with mu as a list entry
+  simulation_results[[paste0("mu_", mu)]] <- output
+}
+
+# Combine results into one data frame for plotting
+combined_results <- do.call(rbind, lapply(names(simulation_results), function(name) {
+  data <- simulation_results[[name]]
+  data$mu <- name  # Add the mu value as a column
+  return(data)
+}))
+
+
+# Plot total infected for each mu value
+plot4 = ggplot(data = combined_results, aes(x = time, y = Total_Infected, color = mu)) +
+  geom_line(size = 1) +  # Plot Total Infected for each mu
+  labs(title = "Total Infected Population Over Time with quarantine", 
+       x = "Time (weeks)", 
+       y = "Population") +
+  scale_color_manual("",
+                     breaks = c("mu_0", "mu_0.01", "mu_0.04", "mu_0.08"),  # Correct breaks for mu
+                     labels = c("quarantine (μ = 0)", "quarantine (μ = 0.01)", 
+                                "quarantine (μ = 0.04)", "quarantine (μ = 0.08)"),  # Update labels
+                     values = c("brown", "orange", "green", "purple")) +  # Set colors for mu values
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+# Save the first plot
+save_plot(plot4, "Total_number_infected_per_different_quarantine_rates.png")
+
+
+
+```
+
+
+
+# Let's now compare contact tracing with a rate of 0.02 on its own and contact tracing with a rate of 0.04 on its own, to the combination of both contact tracing (0.02) and quarantine (0.04). Both impact the beta values.
+
+```{r}
+# Define base parameters
+base_params <- c(
+  beta_s = (0.5 * 2),  # Transmission rate via the sexual route
+  beta_ns = 0.5,       # Transmission rate via other non-sexual routes
+  gamma_I = 0.6,       # Recovery rate for those who were infectious and remained in the general population
+  sigma = 0.1910888,   # Detection rate
+  gamma_Id = 0.8,      # Recovery rate for those who were detected
+  rho_I = 0.065,       # Mortality rate for the infected people in the community
+  rho_Id = 0.03        # Mortality rate for the infected people that were detected and isolated
+)
+
+# Define initial state
+initial_state <- c(
+  S = 105e3,    # Susceptible
+  I_s = 5,      # Infectious via the sexual route
+  I_ns = 20,    # Infectious via other routes
+  Id = 8,       # Detected population
+  R = 0,        # Recovered
+  D = 0         # Dead
+)
+
+# Define the time sequence for 57 weeks
+times <- seq(1, 57, by = 1)
+
+# Define the model function with both contact tracing and quarantine effects
+mpox_model_combined <- function(time, state, parms) {
+  with(as.list(c(state, parms)), {
+    N <- S + I_s + I_ns + Id + R + D
+    
+    # Calculate the modified transmission rates
+    contact_tracing <- parms["contact_tracing"]
+    quarantine <- parms["quarantine"]
+    
+    effective_beta_s <- (1 - contact_tracing) * (1 - quarantine) * beta_s
+    effective_beta_ns <- (1 - contact_tracing) * (1 - quarantine) * beta_ns
+    
+    dS <- -effective_beta_s * S * I_s / N - effective_beta_ns * S * I_ns / N
+    dI_s <- effective_beta_s * S * I_s / N - gamma_I * I_s - sigma * I_s - rho_I * I_s
+    dI_ns <- effective_beta_ns * S * I_ns / N - gamma_I * I_ns - sigma * I_ns - rho_I * I_ns
+    dId <- sigma * (I_s + I_ns) - gamma_Id * Id - rho_Id * Id
+    dR <- gamma_I * (I_s + I_ns) + gamma_Id * Id
+    dD <- rho_I * (I_s + I_ns) + rho_Id * Id
+    
+    return(list(c(dS, dI_s, dI_ns, dId, dR, dD)))
+  })
+}
+
+# Values for interventions to test
+intervention_values <- c(0.02,0.02, 0.04)  # Contact tracing and quarantine rates of 0.02
+
+# Prepare an empty list to store simulation results
+simulation_results <- list()
+
+# Run simulations for different scenarios: no intervention, contact tracing only, quarantine only, and both combined
+scenarios <- list(
+  "No_Intervention" = c(contact_tracing = 0, quarantine = 0),
+  "Contact_Tracing_0.02" = c(contact_tracing = 0.02, quarantine = 0),
+  "Quarantine_0.04" = c(contact_tracing = 0, quarantine = 0.04),
+  "Both_Combined_0.02_and_0.04" = c(contact_tracing = 0.02, quarantine = 0.04)
+)
+
+for (scenario in names(scenarios)) {
+  # Add the intervention values to parameters
+  params_with_intervention <- c(base_params, scenarios[[scenario]])
+  
+  # Run the simulation
+  simulation <- ode(y = initial_state, times = times, func = mpox_model_combined, parms = params_with_intervention)
+  
+  # Convert the output to a data frame for analysis and plotting
+  output <- as.data.frame(simulation)
+  
+  # Rename columns for clarity
+  colnames(output) <- c("time", "Susceptible", "Infectious_Sexual", "Infectious_NonSexual", "Detected", "Recovered", "Dead")
+  
+  # Calculate total infected
+  output$Total_Infected <- output$Infectious_Sexual + output$Infectious_NonSexual
+  
+  # Store results with the scenario name as a list entry
+  simulation_results[[scenario]] <- output
+}
+
+# Combine results into one data frame for plotting
+combined_results <- do.call(rbind, lapply(names(simulation_results), function(name) {
+  data <- simulation_results[[name]]
+  data$scenario <- name  # Add the scenario name as a column
+  return(data)
+}))
+
+# Plot total infected for each scenario
+plot5 = ggplot(data = combined_results, aes(x = time, y = Total_Infected, color = scenario)) +
+  geom_line(size = 1) +  # Plot Total Infected for each scenario
+  labs(title = "Total Infected Population Over Time with Various Interventions", 
+       x = "Time (weeks)", 
+       y = "Population") +
+  scale_color_manual("",
+                     breaks = c("No_Intervention", "Contact_Tracing_0.02", "Quarantine_0.04", "Both_Combined_0.02_and_0.04"),  
+                     labels = c("No Intervention (μ = 0)", 
+                                "Contact Tracing (μ = 0.02)", 
+                                "Quarantine (μ = 0.04)", 
+                                "Both Combined (μ = 0.02 and μ = 0.04)"),  
+                     values = c("black", "blue", "red", "purple")) +  # Set colors for scenarios
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+
+# Save the first plot
+save_plot(plot5, "Total_number_infected_per_different_interventions.png")
+
+
+
+
+
+```
+
+
+
+
+
 
 
 
